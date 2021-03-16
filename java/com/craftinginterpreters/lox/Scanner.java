@@ -128,8 +128,13 @@ class Scanner {
   }
 
   private void string() {
+    var value = new StringBuilder();
     while (peek() != '"' && !isAtEnd()) {
       if (peek() == '\n') line++;
+      if (peek() == '\\' && peekNext() == '"') {
+        advance();
+      }
+      value.append(peek());
       advance();
     }
 
@@ -141,10 +146,7 @@ class Scanner {
     // The closing ".
     advance();
 
-    // Trim the surrounding quotes.
-    // QQ: Looks like that does not cover "\""
-    String value = source.substring(start + 1, current - 1);
-    addToken(STRING, value);
+    addToken(STRING, value.toString());
   }
 
   private boolean match(char expected) {
