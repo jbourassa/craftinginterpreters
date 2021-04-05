@@ -1,4 +1,5 @@
 package com.craftinginterpreters.lox;
+import java.util.List;
 
 class AstPrinter implements Expr.Visitor<String> {
   String print(Expr expr) {
@@ -24,6 +25,11 @@ class AstPrinter implements Expr.Visitor<String> {
   @Override
   public String visitUnaryExpr(Expr.Unary expr) {
     return parenthesize(expr.operator.lexeme, expr.right);
+  }
+
+  @Override
+  public String visitMultiExpr(Expr.Multi expr) {
+    return parenthesize("multi", expr.expressions.toArray(new Expr[0]));
   }
 
   private String parenthesize(String name, Expr... exprs) {

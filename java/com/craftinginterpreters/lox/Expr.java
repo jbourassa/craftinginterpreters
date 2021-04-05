@@ -6,6 +6,7 @@ abstract class Expr {
   interface Visitor<R> {
     R visitBinaryExpr(Binary expr);
     R visitGroupingExpr(Grouping expr);
+    R visitMultiExpr(Multi expr);
     R visitLiteralExpr(Literal expr);
     R visitUnaryExpr(Unary expr);
   }
@@ -36,6 +37,18 @@ abstract class Expr {
     }
 
     final Expr expression;
+  }
+  static class Multi extends Expr {
+    Multi(List<Expr> expressions) {
+      this.expressions = expressions;
+    }
+
+    @Override
+    <R> R accept(Visitor<R> visitor) {
+      return visitor.visitMultiExpr(this);
+    }
+
+    final List<Expr> expressions;
   }
   static class Literal extends Expr {
     Literal(Object value) {
