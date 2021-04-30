@@ -34,26 +34,28 @@ public class Lox {
   private static void runPrompt() throws IOException {
     InputStreamReader input = new InputStreamReader(System.in);
     BufferedReader reader = new BufferedReader(input);
+    
 
     for (;;) { 
       System.out.print("> ");
       String line = reader.readLine();
       if (line == null) break;
-      run(line);
+      var result = run(line);
+      if (result != null) System.out.println("=> " + result.toString());
       hadError = false;
     }
   }
 
-  private static void run(String source) {
+  private static Object run(String source) {
     Scanner scanner = new Scanner(source);
     List<Token> tokens = scanner.scanTokens();
     Parser parser = new Parser(tokens);
     List<Stmt> statements = parser.parse();
 
     // Stop if there was a syntax error.
-    if (hadError) return;
+    if (hadError) return null;
 
-    interpreter.interpret(statements);
+    return interpreter.interpret(statements);
   }
 
   static void error(int line, String message) {

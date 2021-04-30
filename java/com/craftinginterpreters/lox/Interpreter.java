@@ -1,16 +1,19 @@
 package com.craftinginterpreters.lox;
 import java.util.List;
 
-public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
+public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Object> {
   private Environment environment = new Environment();
 
-  public void interpret(List<Stmt> statements) {
+  public Object interpret(List<Stmt> statements) {
     try {
+      Object lastStatement = null;
       for (Stmt statement : statements) {
-        execute(statement);
+        lastStatement = execute(statement);
       }
+      return lastStatement;
     } catch (RuntimeError error) {
       Lox.runtimeError(error);
+      return null;
     }
   }
 
@@ -96,32 +99,31 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     return expr.accept(this);
   }
 
-  private void execute(Stmt stmt) {
-    stmt.accept(this);
+  private Object execute(Stmt stmt) {
+    return stmt.accept(this);
   }
 
   @Override
-  public Void visitBlockStmt(Stmt.Block stmt) {
+  public Object visitBlockStmt(Stmt.Block stmt) {
     executeBlock(stmt.statements, new Environment(environment));
     return null;
   }
 
 
   @Override
-  public Void visitExpressionStmt(Stmt.Expression stmt) {
-    evaluate(stmt.expression);
-    return null;
+  public Object visitExpressionStmt(Stmt.Expression stmt) {
+    return evaluate(stmt.expression);
   }
 
   @Override
-  public Void visitPrintStmt(Stmt.Print stmt) {
+  public Object visitPrintStmt(Stmt.Print stmt) {
     Object value = evaluate(stmt.expression);
     System.out.println(stringify(value));
     return null;
   }
 
   @Override
-  public Void visitVarStmt(Stmt.Var stmt) {
+  public Object visitVarStmt(Stmt.Var stmt) {
     Object value = null;
     if (stmt.initializer != null) {
       value = evaluate(stmt.initializer);
@@ -135,7 +137,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   public Object visitAssignExpr(Expr.Assign expr) {
     Object value = evaluate(expr.value);
     environment.assign(expr.name, value);
-    return value;
+    return null;
   }
   
   void executeBlock(List<Stmt> statements, Environment environment) {
