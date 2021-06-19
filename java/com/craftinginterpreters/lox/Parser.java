@@ -27,7 +27,7 @@ class Parser {
 
   private Stmt declaration() {
     try {
-      if (match(FUN)) return function("function");
+      if (match(FUN)) return functionDeclaration("function");
       if (match(VAR)) return varDeclaration();
 
       return statement();
@@ -37,8 +37,18 @@ class Parser {
     }
   }
 
-  private Stmt.Function function(String kind) {
+  private Stmt.Function functionDeclaration(String kind) {
     Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+    return new Stmt.Function(name, functionParams(kind), functionBody(kind));
+  }
+
+  private Expr.Fun funExpression() {
+    var kind = "anon";
+    return new Expr.Fun(functionParams(kind), functionBody(kind));
+  }
+    // List<Token> params, List<Stmt> body
+
+  private List<Token> functionParams(String kind) {
     consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
 
     List<Token> parameters = new ArrayList<>();
@@ -53,10 +63,12 @@ class Parser {
     }
     consume(RIGHT_PAREN, "Expect ')' after parameters.");
 
-    consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
-    List<Stmt> body = block();
+    return parameters;
+  }
 
-    return new Stmt.Function(name, parameters, body);
+  private List<Stmt> functionBody(String kind) {
+    consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+    return block();
   }
 
   private Stmt varDeclaration() {
@@ -327,6 +339,8 @@ class Parser {
       consume(RIGHT_PAREN, "Expect ')' after expression.");
       return new Expr.Grouping(expr);
     }
+
+    if (match(FUN)) return funExpression();
 
     throw error(peek(), "Expect expression.");
   }
