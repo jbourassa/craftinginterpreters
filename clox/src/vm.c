@@ -66,6 +66,7 @@ static InterpretResult run() {
       case OP_MULTIPLY: BINARY_OP(*); break;
       case OP_DIVIDE:   BINARY_OP(/); break;
       case OP_NEGATE:   push(-pop()); break;
+      case OP_NEGATE_IP: *(vm.stackTop-1) *= -1; break;
     }
   }
 
