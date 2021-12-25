@@ -1,0 +1,8 @@
+gcc
+%c -std=c99
+-I
+src
+-Wall
+-Wextra
+-Werror
+-Wno-unused-parameter
