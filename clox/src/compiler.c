@@ -127,6 +127,16 @@ static uint8_t makeConstant(Value value) {
   return (uint8_t)constant;
 }
 
+static uint8_t makeIdentifier(Value value) {
+  int identifier = addIdentifier(currentChunk(), value);
+  if (identifier > UINT8_MAX) {
+    error("Too many identifiers in one chunk.");
+    return 0;
+  }
+
+  return (uint8_t)identifier;
+}
+
 static void emitConstant(Value value) {
   emitBytes(OP_CONSTANT, makeConstant(value));
 }
@@ -146,21 +156,21 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
-static uint8_t identifierConstant(Token* name) {
+static uint8_t identifier(Token* name) {
   Value constant;
   ObjString* str = copyString(name->start, name->length);
   if (tableGet(&globalConsts, str, &constant)) {
     return (uint8_t) AS_NUMBER(constant);
   }
 
-  uint8_t constantInt = makeConstant(OBJ_VAL(str));
+  uint8_t constantInt = makeIdentifier(OBJ_VAL(str));
   tableSet(&globalConsts, str, NUMBER_VAL(constantInt));
   return constantInt;
 }
 
 static uint8_t parseVariable(const char* errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
-  return identifierConstant(&parser.previous);
+  return identifier(&parser.previous);
 }
 
 static void defineVariable(uint8_t global) {
@@ -287,7 +297,7 @@ static void string(bool canAssign) {
 }
 
 static void namedVariable(Token name, bool canAssign) {
-  uint8_t arg = identifierConstant(&name);
+  uint8_t arg = identifier(&name);
 
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
