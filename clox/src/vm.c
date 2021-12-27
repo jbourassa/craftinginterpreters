@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "compiler.h"
@@ -10,6 +11,7 @@
 #include "memory.h"
 
 VM vm;
+Value** identifiersCache;
 
 static void resetStack() {
   vm.stackTop = vm.stack;
@@ -76,8 +78,8 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define READ_IDENTIFIER() (vm.chunk->identifiers.values[READ_BYTE()])
-#define READ_STRING() AS_STRING(READ_CONSTANT())
-#define READ_IDENTIFIER_STRING() AS_STRING(READ_IDENTIFIER())
+#define IDENTIFIER(i) (vm.chunk->identifiers.values[i])
+#define IDENTIFIER_STRING(i) AS_STRING(IDENTIFIER(i))
 #define BINARY_OP(valueType, op) \
     do { \
       if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
@@ -136,28 +138,41 @@ static InterpretResult run() {
       case OP_FALSE:    push(BOOL_VAL(false)); break;
       case OP_POP:      pop(); break;
       case OP_GET_GLOBAL: {
-        ObjString* name = READ_IDENTIFIER_STRING();
+        uint8_t identifier = READ_BYTE();
+        if (identifiersCache[identifier]) {
+          push(*identifiersCache[identifier]);
+          break;
+        }
+
+        ObjString* name = IDENTIFIER_STRING(identifier);
         Value value;
         if (!tableGet(&vm.globals, name, &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
+        identifiersCache[identifier] = &value;
         push(value);
         break;
       }
       case OP_DEFINE_GLOBAL: {
-        ObjString* name = READ_IDENTIFIER_STRING();
-        tableSet(&vm.globals, name, peek(0));
+        uint8_t identifier = READ_BYTE();
+        ObjString* name = IDENTIFIER_STRING(identifier);
+        Value value = peek(0);
+        tableSet(&vm.globals, name, value);
+        identifiersCache[identifier] = &value;
         pop();
         break;
       }
       case OP_SET_GLOBAL: {
-        ObjString* name = READ_IDENTIFIER_STRING();
-        if (tableSet(&vm.globals, name, peek(0))) {
+        uint8_t identifier = READ_BYTE();
+        ObjString* name = IDENTIFIER_STRING(identifier);
+        Value value = peek(0);
+        if (tableSet(&vm.globals, name, value)) {
           tableDelete(&vm.globals, name);
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
+        identifiersCache[identifier] = &value;
         break;
       }
       case OP_EQUAL: {
@@ -186,8 +201,8 @@ static InterpretResult run() {
 #undef READ_BYTE
 #undef READ_CONSTANT
 #undef READ_IDENTIFIER
-#undef READ_STRING
-#undef READ_IDENTIFIER_STRING
+#undef IDENTIFIER
+#undef IDENTIFIER_STRING
 #undef BINARY_OP
 }
 
@@ -202,9 +217,11 @@ InterpretResult interpret(const char* source) {
 
   vm.chunk = &chunk;
   vm.ip = vm.chunk->code;
+  identifiersCache = calloc(chunk.constants.count, sizeof(Value*));
 
   InterpretResult result = run();
 
+  free(identifiersCache);
   freeChunk(&chunk);
   return result;
 }

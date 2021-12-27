@@ -19,6 +19,14 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 2;
 }
 
+static int identifierInstruction(const char* name, Chunk* chunk, int offset) {
+  uint8_t identifier = chunk->code[offset + 1];
+  printf("%-16s %4d '", name, identifier);
+  printValue(chunk->identifiers.values[identifier]);
+  printf("'\n");
+  return offset + 2;
+}
+
 static int simpleInstruction(const char* name, int offset) {
   printf("%s\n", name);
   return offset + 1;
@@ -47,11 +55,11 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_EQUAL:
       return simpleInstruction("OP_EQUAL", offset);
     case OP_SET_GLOBAL:
-      return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+      return identifierInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_GET_GLOBAL:
-      return constantInstruction("OP_GET_GLOBAL", chunk, offset);
+      return identifierInstruction("OP_GET_GLOBAL", chunk, offset);
     case OP_DEFINE_GLOBAL:
-      return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+      return identifierInstruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_GREATER:
       return simpleInstruction("OP_GREATER", offset);
     case OP_LESS:
