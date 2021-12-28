@@ -5,6 +5,8 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "table.h"
+#include "lcache.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -48,6 +50,7 @@ typedef struct {
   Local locals[UINT8_COUNT];
   int localCount;
   int scopeDepth;
+  Lcache cache;
 } Compiler;
 
 Parser parser;
@@ -144,10 +147,12 @@ static void emitConstant(Value value) {
 static void initCompiler(Compiler* compiler) {
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
+  initLcache(&compiler->cache);
   current = compiler;
 }
 
-static void endCompiler() {
+static void endCompiler(Compiler* compiler) {
+  freeLcache(&compiler->cache);
   emitReturn();
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
@@ -165,6 +170,18 @@ static void beginScope() {
 static void endScope() {
   current->scopeDepth--;
 
+  for (int i = 0; i < current->cache.capacity; i ++) {
+    LcacheValues* locals = &current->cache.entries[i].locals;
+    if (locals->count < 1) continue;
+    if (locals->values[locals->count - 1].depth > current->scopeDepth) {
+      locals->count--;
+      // @NOTE it would be nice to cleanup entries once they're no longer needed,
+      // otherwise this is gonna get costly over time.
+      // Something like:
+      // if locals->count == 0
+    }
+  }
+
   while (
     current->localCount > 0 &&
     current->locals[current->localCount - 1].depth > current->scopeDepth
@@ -173,7 +190,6 @@ static void endScope() {
     current->localCount--;
   }
 }
-
 
 static void statement();
 static void declaration();
@@ -190,14 +206,16 @@ static bool identifiersEqual(Token* a, Token* b) {
 }
 
 static int resolveLocal(Compiler* compiler, Token* name) {
-  for (int i = compiler->localCount - 1; i >= 0; i--) {
-    Local* local = &compiler->locals[i];
-    if (identifiersEqual(name, &local->name)) {
-      if (local->depth == -1) {
-        error("Can't read local variable in its own initializer.");
-      }
-      return i;
+  ObjString* string = copyString(name->start, name->length);
+  LcacheValues* cacheEntries = lcacheGet(&current->cache, string);
+  if (cacheEntries->count > 0) {
+    int localIndex = cacheEntries->values[cacheEntries->count - 1].index;
+    Local* local = &compiler->locals[localIndex];
+    if (local->depth == -1) {
+      error("Can't read local variable in its own initializer.");
     }
+
+    return localIndex;
   }
 
   return -1;
@@ -242,7 +260,10 @@ static uint8_t parseVariable(const char* errorMessage) {
 }
 
 static void markInitialized() {
-  current->locals[current->localCount - 1].depth = current->scopeDepth;
+  Local *local = &current->locals[current->localCount - 1];
+  local->depth = current->scopeDepth;
+  ObjString* string = copyString(local->name.start, local->name.length);
+  lcacheAdd(&current->cache, string, local->depth, current->localCount - 1);
 }
 
 static void defineVariable(uint8_t global) {
@@ -506,6 +527,6 @@ bool compile(const char* source, Chunk* chunk) {
   }
   consume(TOKEN_EOF, "Expect end of expression.");
 
-  endCompiler();
+  endCompiler(&compiler);
   return !parser.hadError;
 }

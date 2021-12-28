@@ -60,6 +60,20 @@ static void runFile(const char* path) {
 
 int main(int argc, char *argv[]) {
   initVM();
+  interpret(
+      " \
+      var a = 0; \
+      { \
+        var a = 1;\
+        print a;\
+        var b = 2;\
+        print b;\
+      }\
+      print a;\
+      print b;\
+      "
+  );
+  return 0;
 
   if (argc == 1) {
     repl();
