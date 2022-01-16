@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
+  bool readonly;
 } Local;
 
 typedef struct {
@@ -203,7 +204,7 @@ static int resolveLocal(Compiler* compiler, Token* name) {
   return -1;
 }
 
-static void addLocal(Token name) {
+static void addLocal(Token name, bool readonly) {
   if (current->localCount == UINT8_COUNT) {
     error("Too many local variables in function.");
     return;
@@ -212,9 +213,10 @@ static void addLocal(Token name) {
   Local* local = &current->locals[current->localCount++];
   local->name = name;
   local->depth = -1;
+  local->readonly = readonly;
 }
 
-static void declareVariable() {
+static void declareVariable(bool readonly) {
   if (current->scopeDepth == 0) return;
 
   Token* name = &parser.previous;
@@ -229,13 +231,13 @@ static void declareVariable() {
     }
   }
 
-  addLocal(*name);
+  addLocal(*name, readonly);
 }
 
-static uint8_t parseVariable(const char* errorMessage) {
+static uint8_t parseVariable(const char* errorMessage, bool readonly) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
-  declareVariable();
+  declareVariable(readonly);
   if (current->scopeDepth > 0) return 0;
 
   return identifierConstant(&parser.previous);
@@ -254,12 +256,16 @@ static void defineVariable(uint8_t global) {
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
-static void varDeclaration() {
-  uint8_t global = parseVariable("Expect variable name.");
+static void varDeclaration(bool readonly) {
+  uint8_t global = parseVariable("Expect variable name.", readonly);
 
   if (match(TOKEN_EQUAL)) {
     expression();
-  } else {
+  }
+  else {
+    // const name; is invalid
+    if (readonly)  error("const must be assigned a value");
+    
     emitByte(OP_NIL);
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
@@ -347,7 +353,10 @@ static void synchronize() {
 
 static void declaration() {
   if (match(TOKEN_VAR)) {
-    varDeclaration();
+    varDeclaration(false);
+  }
+  else if (match(TOKEN_CONST)) {
+    varDeclaration(true);
   } else {
     statement();
   }
@@ -398,6 +407,11 @@ static void namedVariable(Token name, bool canAssign) {
   }
 
   if (canAssign && match(TOKEN_EQUAL)) {
+    if (setOp == OP_SET_LOCAL && current->locals[arg].readonly) {
+      error("Can't reassign a const");
+      return;
+    }
+
     expression();
     emitBytes(setOp, (uint8_t)arg);
   } else {
@@ -461,6 +475,7 @@ ParseRule rules[] = {
   [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
   [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_CONST]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE},
