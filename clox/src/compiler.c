@@ -48,6 +48,8 @@ typedef struct {
   Local locals[UINT8_COUNT];
   int localCount;
   int scopeDepth;
+  int loopScopeDepth;
+  int loopStart;
 } Compiler;
 
 Parser parser;
@@ -173,6 +175,8 @@ static void patchJump(int offset) {
 static void initCompiler(Compiler* compiler) {
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
+  compiler->loopScopeDepth = 0;
+  compiler->loopStart = -1;
   current = compiler;
 }
 
@@ -364,7 +368,10 @@ static void forStatement() {
     expressionStatement();
   }
 
-  int loopStart = currentChunk()->count;
+  int loopStartWas = current->loopStart;
+  int loopScopeDepthWas = current->loopScopeDepth;
+  current->loopStart = currentChunk()->count;
+  current->loopScopeDepth = current->scopeDepth;
   int exitJump = -1;
   if (!match(TOKEN_SEMICOLON)) {
     expression();
@@ -382,13 +389,15 @@ static void forStatement() {
     emitByte(OP_POP);
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
 
-    emitLoop(loopStart);
-    loopStart = incrementStart;
+    emitLoop(current->loopStart);
+    current->loopStart = incrementStart;
     patchJump(bodyJump);
   }
 
   statement();
-  emitLoop(loopStart);
+  emitLoop(current->loopStart);
+  current->loopStart = loopStartWas;
+  current->loopScopeDepth = loopScopeDepthWas;
 
   if (exitJump != -1) {
     patchJump(exitJump);
@@ -396,6 +405,23 @@ static void forStatement() {
   }
 
   endScope();
+}
+
+static void continueStatement() {
+  if (current->loopStart == -1) {
+    return error("No for statement to continue.");
+  }
+  consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+
+  for (
+    int i = current->localCount - 1;
+    i >= 0 && current->locals[i].depth > current->loopScopeDepth;
+    i--
+  ) {
+    emitByte(OP_POP);
+  }
+
+  emitLoop(current->loopStart);
 }
 
 static void ifStatement() {
@@ -484,6 +510,8 @@ static void statement() {
     beginScope();
     block();
     endScope();
+  } else if (match(TOKEN_CONTINUE)) {
+    continueStatement();
   } else {
     expressionStatement();
   }
@@ -595,6 +623,7 @@ ParseRule rules[] = {
   [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_CONTINUE]      = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE},
 };
