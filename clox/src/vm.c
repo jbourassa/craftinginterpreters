@@ -63,6 +63,7 @@ void initVM() {
 
   vm.bytesAllocated = 0;
   vm.nextGC = 1024 * 1024;
+  vm.gcCycle = 0;
 
   vm.grayCount = 0;
   vm.grayCapacity = 0;

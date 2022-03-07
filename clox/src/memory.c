@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <limits.h>
 
 #include "compiler.h"
 #include "memory.h"
@@ -11,6 +12,7 @@
 #endif
 
 #define GC_HEAP_GROW_FACTOR 2
+#define IS_MARKED(obj) (vm.gcCycle == obj->gcMark)
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
   vm.bytesAllocated += newSize - oldSize;
@@ -35,7 +37,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 
 void markObject(Obj* object) {
   if (object == NULL) return;
-  if (object->isMarked) return;
+  if (IS_MARKED(object)) return;
 
 #ifdef DEBUG_LOG_GC
   printf("%p mark ", (void*)object);
@@ -43,7 +45,7 @@ void markObject(Obj* object) {
   printf("\n");
 #endif
 
-  object->isMarked = true;
+  object->gcMark = vm.gcCycle;
 
   if (vm.grayCapacity < vm.grayCount + 1) {
     vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
@@ -169,8 +171,7 @@ static void sweep() {
   Obj* previous = NULL;
   Obj* object = vm.objects;
   while (object != NULL) {
-    if (object->isMarked) {
-      object->isMarked = false;
+    if (IS_MARKED(object)) {
       previous = object;
       object = object->next;
     } else {
@@ -199,6 +200,7 @@ void collectGarbage() {
   sweep();
 
   vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
+  vm.gcCycle = (vm.gcCycle + 1) % INT_MAX;
 
 #ifdef DEBUG_LOG_GC
   printf("-- gc end\n");
