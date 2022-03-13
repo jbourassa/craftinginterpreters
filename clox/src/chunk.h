@@ -13,6 +13,8 @@ typedef enum {
   OP_GET_LOCAL,
   OP_SET_LOCAL,
   OP_GET_GLOBAL,
+  OP_GET_PROPERTY,
+  OP_SET_PROPERTY,
   OP_EQUAL,
   OP_DEFINE_GLOBAL,
   OP_SET_GLOBAL,
@@ -34,6 +36,7 @@ typedef enum {
   OP_NOT,
   OP_NEGATE,
   OP_PRINT,
+  OP_CLASS,
 } OpCode;
 
 typedef struct {
