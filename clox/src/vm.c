@@ -224,6 +224,23 @@ static InterpretResult run() {
 
     uint8_t instruction;
     switch (instruction = READ_BYTE()) {
+      case OP_DELETE_FIELD: {
+        if (!IS_INSTANCE(peek(0))) {
+          runtimeError("Can instances support deletion.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(peek(0));
+        ObjString* name = READ_STRING();
+
+        if (tableDelete(&instance->fields, name)) {
+          pop();
+          break;
+        }
+
+        runtimeError("Unknown property: '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
       case OP_CONSTANT: {
         Value constant = READ_CONSTANT();
         push(constant);

@@ -37,6 +37,7 @@ typedef enum {
   OP_NEGATE,
   OP_PRINT,
   OP_CLASS,
+  OP_DELETE_FIELD,
 } OpCode;
 
 typedef struct {
